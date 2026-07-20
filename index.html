@@ -121,18 +121,6 @@
   .err-note{ color:var(--red); font-size:11.5px; margin-top:4px; line-height:1.4; }
   .empty{ padding:36px 18px; text-align:center; color:var(--text-dim); font-size:13.5px; }
 
-  .console{
-    background:#0c1015; border:1px solid var(--line); border-radius:12px;
-    padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:12px;
-    max-height:220px; overflow-y:auto;
-  }
-  .console-line{ padding:3px 0; color:var(--text-dim); display:flex; gap:10px; }
-  .console-line .t{ color:#4b5769; flex-shrink:0; }
-  .console-line.ok .msg{ color:var(--teal); }
-  .console-line.warn .msg{ color:var(--amber); }
-  .console-line.err .msg{ color:var(--red); }
-  .console-line.info .msg{ color:var(--text); }
-
   footer{ text-align:center; color:var(--text-dim); font-size:11.5px; padding:20px; }
   a{ color:var(--blue); }
 
@@ -181,12 +169,6 @@
     </div>
   </div>
 
-  <div class="panel">
-    <div class="panel-head">Activity log</div>
-    <div style="padding:14px 16px 16px;">
-      <div class="console" id="consoleLog"></div>
-    </div>
-  </div>
 </main>
 
 <footer>SCAC-authenticated via account email · Walmart Freight Tender API · SHV SOR Integration API</footer>
@@ -197,17 +179,6 @@ const WMT_URL = "https://wmt-freight-portal.vercel.app/api/sap/loads";
 const SHV_URL = "https://shv-logistics-tms.vercel.app/api/sor/loads";
 
 let sanitizedRows = []; // { raw, sanitized, valid, errors }
-
-function log(msg, level="info"){
-  const el = document.getElementById('consoleLog');
-  const line = document.createElement('div');
-  line.className = `console-line ${level}`;
-  const time = new Date().toLocaleTimeString();
-  line.innerHTML = `<span class="t">${time}</span><span class="msg"></span>`;
-  line.querySelector('.msg').textContent = msg;
-  el.appendChild(line);
-  el.scrollTop = el.scrollHeight;
-}
 
 function setLoading(btnId, labelId, isLoading, idleText){
   const btn = document.getElementById(btnId);
@@ -356,39 +327,32 @@ function renderStats(){
 async function fetchLoads(){
   setLoading('fetchBtn','fetchLabel', true);
   document.getElementById('pushBtn').disabled = true;
-  log(`GET ${WMT_URL}`, 'info');
   try {
     const res = await fetch(WMT_URL, {
       headers: { 'Authorization': `Bearer ${EMAIL}` }
     });
     if (res.status === 401) {
-      log('401 Unauthorized — Authorization header missing or malformed', 'err');
       alert('Walmart portal rejected the request (401 Unauthorized).');
       return;
     }
     if (res.status === 429) {
       const retry = res.headers.get('Retry-After') || 'a few';
-      log(`429 Rate limited — retry after ${retry}s`, 'err');
       alert(`Rate limited by the Walmart portal. Retry after ${retry}s.`);
       return;
     }
     if (!res.ok) {
-      log(`Unexpected status ${res.status}`, 'err');
       alert(`Unexpected response from Walmart portal: ${res.status}`);
       return;
     }
     const data = await res.json();
-    log(`200 OK — ${data.count} load(s) from "${data.source}"`, 'ok');
 
     sanitizedRows = (data.loads || []).map(sanitizeLoad);
     const readyCount = sanitizedRows.filter(r=>r.valid).length;
     const reviewCount = sanitizedRows.length - readyCount;
-    log(`Sanitized: ${readyCount} ready, ${reviewCount} need review`, reviewCount ? 'warn' : 'ok');
 
     renderTable();
     renderStats();
   } catch (e) {
-    log(`Fetch failed: ${e.message}`, 'err');
     alert(`Could not reach the Walmart portal. This may be a network or CORS issue: ${e.message}`);
   } finally {
     setLoading('fetchBtn','fetchLabel', false, 'Fetch Loads');
@@ -404,7 +368,6 @@ async function pushLoads(){
   }
   setLoading('pushBtn','pushLabel', true);
   const body = { loads: toPush.map(r => r.sanitized) };
-  log(`POST ${SHV_URL} — pushing ${toPush.length} load(s)`, 'info');
 
   try {
     const res = await fetch(SHV_URL, {
@@ -417,18 +380,15 @@ async function pushLoads(){
     });
 
     if (res.status === 401) {
-      log('401 Unauthorized — Authorization header missing or malformed', 'err');
       alert('SHV TMS rejected the request (401 Unauthorized).');
       return;
     }
     if (res.status === 429) {
       const retry = res.headers.get('Retry-After') || 'a few';
-      log(`429 Rate limited or capacity exceeded — retry after ${retry}s`, 'err');
       alert(`Rate limited / capacity exceeded on SHV TMS. Retry after ${retry}s.`);
       return;
     }
     if (res.status === 400) {
-      log('400 Malformed request body', 'err');
       alert('SHV TMS reported the request body was malformed.');
       return;
     }
@@ -448,17 +408,13 @@ async function pushLoads(){
     });
 
     if (res.status === 200) {
-      log(`200 OK — ${data.accepted.length} load(s) accepted into the SOR`, 'ok');
     } else if (res.status === 422) {
-      log(`422 — ${data.accepted.length} accepted, ${data.rejected.length} rejected`, 'warn');
     } else {
-      log(`Status ${res.status} — ${data.message || ''}`, 'warn');
     }
 
     renderTable();
     renderStats();
   } catch (e) {
-    log(`Push failed: ${e.message}`, 'err');
     alert(`Could not reach the SHV TMS. This may be a network or CORS issue: ${e.message}`);
   } finally {
     setLoading('pushBtn','pushLabel', false, 'Sanitize & Push');
@@ -466,7 +422,6 @@ async function pushLoads(){
   }
 }
 
-log('Ready. Click Fetch Loads to begin.', 'info');
 </script>
 </body>
 </html>
