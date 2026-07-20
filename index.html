@@ -300,7 +300,7 @@ function renderTable(){
       <td>${s.shipper_name ?? r.raw.shipper_nm ?? '—'}</td>
       <td>${(s.origin_city ?? r.raw.orig_city ?? '—') + ', ' + (s.origin_state ?? r.raw.orig_st ?? '—')} → ${(s.destination_city ?? r.raw.dest_city ?? '—') + ', ' + (s.destination_state ?? r.raw.dest_st ?? '—')}</td>
       <td class="mono">${s.ship_date ?? '—'} / ${s.delivery_date ?? '—'}</td>
-      <td class="mono">${s.weight !== null && s.weight !== undefined ? s.weight.toLocaleString() + ' lb' : '—'}</td>
+      <td class="mono">${s.weight !== null && s.weight !== undefined ? s.weight + ' lb' : '—'}</td>
       <td>${s.equipment_type ?? '—'}</td>
       <td>${badge}${errNote}</td>
     </tr>`;
