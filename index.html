@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SHV ⇄ Walmart Load Bridge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #10141a;
+    --panel: #171d26;
+    --panel-2: #1d2430;
+    --line: #2a3342;
+    --text: #e7ecf2;
+    --text-dim: #8b97a8;
+    --teal: #3ddc97;
+    --amber: #f3b23e;
+    --red: #ef5a5a;
+    --blue: #5aa9ef;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 600px at 15% -10%, #16202b 0%, transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Space Grotesk', -apple-system, sans-serif;
+    min-height:100vh;
+  }
+  .mono{ font-family:'JetBrains Mono', ui-monospace, monospace; }
+  header{
+    padding:28px clamp(16px,4vw,48px) 20px;
+    border-bottom:1px solid var(--line);
+    display:flex; justify-content:space-between; align-items:flex-end; flex-wrap:wrap; gap:16px;
+  }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-mark{
+    width:36px; height:36px; border-radius:8px;
+    background:linear-gradient(135deg, var(--teal), var(--blue));
+    display:flex; align-items:center; justify-content:center;
+    font-weight:700; color:#0a0f14; font-size:15px;
+  }
+  h1{ font-size:19px; margin:0; font-weight:600; letter-spacing:0.2px; }
+  .sub{ color:var(--text-dim); font-size:12.5px; margin-top:2px; }
+  .auth-chip{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px; color:var(--teal);
+    background:rgba(61,220,151,0.08);
+    border:1px solid rgba(61,220,151,0.25);
+    padding:7px 12px; border-radius:20px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .dot{ width:6px; height:6px; border-radius:50%; background:var(--teal); box-shadow:0 0 6px var(--teal); }
+
+  main{ padding:28px clamp(16px,4vw,48px) 60px; max-width:1180px; margin:0 auto; }
+
+  .controls{ display:flex; gap:12px; flex-wrap:wrap; margin-bottom:22px; }
+  button{
+    font-family:inherit; font-size:14px; font-weight:600;
+    padding:13px 22px; border-radius:9px; border:1px solid transparent;
+    cursor:pointer; transition:transform .08s ease, opacity .15s ease, box-shadow .15s ease;
+    display:flex; align-items:center; gap:9px;
+  }
+  button:active:not(:disabled){ transform:scale(0.98); }
+  button:disabled{ opacity:0.4; cursor:not-allowed; }
+  #fetchBtn{ background:var(--teal); color:#0a1410; }
+  #fetchBtn:hover:not(:disabled){ box-shadow:0 0 0 3px rgba(61,220,151,0.18); }
+  #pushBtn{ background:var(--panel-2); color:var(--text); border-color:var(--line); }
+  #pushBtn:hover:not(:disabled){ border-color:var(--blue); box-shadow:0 0 0 3px rgba(90,169,239,0.14); }
+  .spin{
+    width:14px; height:14px; border-radius:50%;
+    border:2px solid rgba(0,0,0,0.25); border-top-color:currentColor;
+    animation:spin .7s linear infinite; display:none;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .loading .spin{ display:inline-block; }
+
+  .summary{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px;
+  }
+  .stat{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:14px 16px;
+  }
+  .stat .n{ font-family:'JetBrains Mono',monospace; font-size:22px; font-weight:600; }
+  .stat .l{ color:var(--text-dim); font-size:11.5px; text-transform:uppercase; letter-spacing:0.6px; margin-top:2px; }
+  .stat.ready .n{ color:var(--teal); }
+  .stat.review .n{ color:var(--amber); }
+  .stat.pushed .n{ color:var(--blue); }
+
+  .panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:12px;
+    overflow:hidden; margin-bottom:20px;
+  }
+  .panel-head{
+    padding:14px 18px; border-bottom:1px solid var(--line);
+    font-size:13px; font-weight:600; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.6px;
+    display:flex; justify-content:space-between; align-items:center;
+  }
+  table{ width:100%; border-collapse:collapse; font-size:13px; }
+  th{
+    text-align:left; padding:10px 14px; color:var(--text-dim);
+    font-weight:500; font-size:11px; text-transform:uppercase; letter-spacing:0.5px;
+    border-bottom:1px solid var(--line); white-space:nowrap;
+  }
+  td{ padding:11px 14px; border-bottom:1px solid var(--line); vertical-align:top; }
+  tr:last-child td{ border-bottom:none; }
+  td.mono{ font-size:12.5px; }
+  .badge{
+    display:inline-flex; align-items:center; gap:5px;
+    font-size:11px; font-weight:600; padding:4px 9px; border-radius:20px;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .badge.ready{ background:rgba(61,220,151,0.12); color:var(--teal); }
+  .badge.review{ background:rgba(243,178,62,0.12); color:var(--amber); }
+  .badge.accepted{ background:rgba(90,169,239,0.14); color:var(--blue); }
+  .badge.rejected{ background:rgba(239,90,90,0.14); color:var(--red); }
+  .err-note{ color:var(--red); font-size:11.5px; margin-top:4px; line-height:1.4; }
+  .empty{ padding:36px 18px; text-align:center; color:var(--text-dim); font-size:13.5px; }
+
+  .console{
+    background:#0c1015; border:1px solid var(--line); border-radius:12px;
+    padding:14px 16px; font-family:'JetBrains Mono',monospace; font-size:12px;
+    max-height:220px; overflow-y:auto;
+  }
+  .console-line{ padding:3px 0; color:var(--text-dim); display:flex; gap:10px; }
+  .console-line .t{ color:#4b5769; flex-shrink:0; }
+  .console-line.ok .msg{ color:var(--teal); }
+  .console-line.warn .msg{ color:var(--amber); }
+  .console-line.err .msg{ color:var(--red); }
+  .console-line.info .msg{ color:var(--text); }
+
+  footer{ text-align:center; color:var(--text-dim); font-size:11.5px; padding:20px; }
+  a{ color:var(--blue); }
+
+  @media (max-width:720px){
+    .summary{ grid-template-columns:repeat(2,1fr); }
+    table{ display:block; overflow-x:auto; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">SH</div>
+    <div>
+      <h1>SHV ⇄ Walmart Load Bridge</h1>
+      <div class="sub">Freight Tender API → sanitize → SOR Integration API</div>
+    </div>
+  </div>
+  <div class="auth-chip mono"><span class="dot"></span>abhijeet99sawant8@gmail.com</div>
+</header>
+
+<main>
+  <div class="controls">
+    <button id="fetchBtn" onclick="fetchLoads()">
+      <span class="spin"></span>
+      <span id="fetchLabel">Fetch Loads</span>
+    </button>
+    <button id="pushBtn" onclick="pushLoads()" disabled>
+      <span class="spin"></span>
+      <span id="pushLabel">Sanitize &amp; Push</span>
+    </button>
+  </div>
+
+  <div class="summary">
+    <div class="stat"><div class="n mono" id="statFetched">–</div><div class="l">Fetched</div></div>
+    <div class="stat ready"><div class="n mono" id="statReady">–</div><div class="l">Ready to push</div></div>
+    <div class="stat review"><div class="n mono" id="statReview">–</div><div class="l">Needs review</div></div>
+    <div class="stat pushed"><div class="n mono" id="statPushed">–</div><div class="l">Pushed to SOR</div></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><span>Sanitized manifest</span><span id="tableCount" class="mono"></span></div>
+    <div id="tableWrap">
+      <div class="empty">No loads fetched yet. Click <strong>Fetch Loads</strong> to pull open tenders from the Walmart portal.</div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">Activity log</div>
+    <div style="padding:14px 16px 16px;">
+      <div class="console" id="consoleLog"></div>
+    </div>
+  </div>
+</main>
+
+<footer>SCAC-authenticated via account email · Walmart Freight Tender API · SHV SOR Integration API</footer>
+
+<script>
+const EMAIL = "abhijeet99sawant8@gmail.com";
+const WMT_URL = "https://wmt-freight-portal.vercel.app/api/sap/loads";
+const SHV_URL = "https://shv-logistics-tms.vercel.app/api/sor/loads";
+
+let sanitizedRows = []; // { raw, sanitized, valid, errors }
+
+function log(msg, level="info"){
+  const el = document.getElementById('consoleLog');
+  const line = document.createElement('div');
+  line.className = `console-line ${level}`;
+  const time = new Date().toLocaleTimeString();
+  line.innerHTML = `<span class="t">${time}</span><span class="msg"></span>`;
+  line.querySelector('.msg').textContent = msg;
+  el.appendChild(line);
+  el.scrollTop = el.scrollHeight;
+}
+
+function setLoading(btnId, labelId, isLoading, idleText){
+  const btn = document.getElementById(btnId);
+  const label = document.getElementById(labelId);
+  btn.classList.toggle('loading', isLoading);
+  label.textContent = isLoading ? 'Working…' : idleText;
+  btn.disabled = isLoading || (btnId === 'pushBtn' && sanitizedRows.filter(r=>r.valid).length === 0);
+}
+
+// ---------- Sanitization ----------
+
+// Walmart dates arrive MMDDYYYY -> TMS needs DDMMYYYY
+function convertDate(raw, label, errors){
+  if (!raw || !/^\d{8}$/.test(raw)) {
+    errors.push(`${label}: expected 8 digits, got "${raw}"`);
+    return null;
+  }
+  const mm = raw.slice(0,2), dd = raw.slice(2,4), yyyy = raw.slice(4,8);
+  const mmN = parseInt(mm,10), ddN = parseInt(dd,10);
+  if (mmN < 1 || mmN > 12 || ddN < 1 || ddN > 31) {
+    errors.push(`${label}: "${raw}" doesn't parse as a valid MMDDYYYY date`);
+    return null;
+  }
+  return dd + mm + yyyy; // DDMMYYYY
+}
+
+function parseWeight(raw, errors){
+  if (raw === null || raw === undefined) {
+    errors.push('wgt: missing weight value');
+    return null;
+  }
+  const digits = String(raw).replace(/[^0-9]/g, '');
+  if (!digits) {
+    errors.push(`wgt: could not extract a number from "${raw}"`);
+    return null;
+  }
+  return parseInt(digits, 10);
+}
+
+function mapEquipment(mode, errors){
+  const m = (mode || '').trim().toUpperCase();
+  if (m === 'AMBIENT') return "Dry Van 53'";
+  if (m === 'FREEZER') return "Reefer 53'";
+  errors.push(`mode: "${mode}" is not AMBIENT or FREEZER — cannot map to an equipment type`);
+  return null;
+}
+
+function cleanStr(raw, label, errors){
+  if (raw === null || raw === undefined) {
+    errors.push(`${label}: missing`);
+    return null;
+  }
+  const trimmed = String(raw).trim();
+  if (!trimmed) {
+    errors.push(`${label}: empty after trimming`);
+    return null;
+  }
+  if (trimmed.length > 200) {
+    errors.push(`${label}: exceeds 200 characters (${trimmed.length})`);
+    return null;
+  }
+  return trimmed;
+}
+
+function sanitizeLoad(raw){
+  const errors = [];
+  const load_number = cleanStr(raw.load_no, 'load_no', errors);
+  const bol_number = cleanStr(raw.frt_ord_no, 'frt_ord_no', errors);
+  const shipper_name = cleanStr(raw.shipper_nm, 'shipper_nm', errors);
+  const origin_city = cleanStr(raw.orig_city, 'orig_city', errors);
+  const origin_state = cleanStr(raw.orig_st, 'orig_st', errors);
+  const destination_city = cleanStr(raw.dest_city, 'dest_city', errors);
+  const destination_state = cleanStr(raw.dest_st, 'dest_st', errors);
+  const ship_date = convertDate(raw.shp_dt, 'shp_dt', errors);
+  const delivery_date = convertDate(raw.del_dt, 'del_dt', errors);
+  const weight = parseWeight(raw.wgt, errors);
+  const equipment_type = mapEquipment(raw.mode, errors);
+
+  if (load_number && !/^LD-\d+$/.test(load_number)) {
+    errors.push(`load_no: "${load_number}" doesn't match expected "LD-<digits>" format`);
+  }
+
+  const sanitized = {
+    load_number, bol_number, shipper_name,
+    origin_city, origin_state, destination_city, destination_state,
+    ship_date, delivery_date, weight, equipment_type
+  };
+
+  return { raw, sanitized, valid: errors.length === 0, errors };
+}
+
+// ---------- Rendering ----------
+
+function renderTable(){
+  const wrap = document.getElementById('tableWrap');
+  const count = document.getElementById('tableCount');
+  if (sanitizedRows.length === 0) {
+    wrap.innerHTML = '<div class="empty">No loads fetched yet. Click <strong>Fetch Loads</strong> to pull open tenders from the Walmart portal.</div>';
+    count.textContent = '';
+    return;
+  }
+  count.textContent = `${sanitizedRows.length} load(s)`;
+
+  let rows = sanitizedRows.map(r => {
+    const s = r.sanitized;
+    const badge = r.pushStatus === 'accepted'
+      ? '<span class="badge accepted">● accepted</span>'
+      : r.pushStatus === 'rejected'
+        ? '<span class="badge rejected">● rejected</span>'
+        : r.valid
+          ? '<span class="badge ready">● ready</span>'
+          : '<span class="badge review">● needs review</span>';
+
+    const errNote = (r.errors && r.errors.length)
+      ? `<div class="err-note">${r.errors.join('<br>')}</div>` : '';
+
+    return `<tr>
+      <td class="mono">${s.load_number ?? r.raw.load_no ?? '—'}</td>
+      <td>${s.shipper_name ?? r.raw.shipper_nm ?? '—'}</td>
+      <td>${(s.origin_city ?? r.raw.orig_city ?? '—') + ', ' + (s.origin_state ?? r.raw.orig_st ?? '—')} → ${(s.destination_city ?? r.raw.dest_city ?? '—') + ', ' + (s.destination_state ?? r.raw.dest_st ?? '—')}</td>
+      <td class="mono">${s.ship_date ?? '—'} / ${s.delivery_date ?? '—'}</td>
+      <td class="mono">${s.weight !== null && s.weight !== undefined ? s.weight.toLocaleString() + ' lb' : '—'}</td>
+      <td>${s.equipment_type ?? '—'}</td>
+      <td>${badge}${errNote}</td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `<table>
+    <thead><tr>
+      <th>Load #</th><th>Shipper</th><th>Lane</th><th>Ship / Del (dd/mm/yyyy)</th><th>Weight</th><th>Equipment</th><th>Status</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function renderStats(){
+  document.getElementById('statFetched').textContent = sanitizedRows.length || '–';
+  document.getElementById('statReady').textContent = sanitizedRows.filter(r=>r.valid).length || '–';
+  document.getElementById('statReview').textContent = sanitizedRows.filter(r=>!r.valid).length || '–';
+  const pushed = sanitizedRows.filter(r=>r.pushStatus === 'accepted').length;
+  document.getElementById('statPushed').textContent = pushed || '–';
+}
+
+// ---------- Actions ----------
+
+async function fetchLoads(){
+  setLoading('fetchBtn','fetchLabel', true);
+  document.getElementById('pushBtn').disabled = true;
+  log(`GET ${WMT_URL}`, 'info');
+  try {
+    const res = await fetch(WMT_URL, {
+      headers: { 'Authorization': `Bearer ${EMAIL}` }
+    });
+    if (res.status === 401) {
+      log('401 Unauthorized — Authorization header missing or malformed', 'err');
+      alert('Walmart portal rejected the request (401 Unauthorized).');
+      return;
+    }
+    if (res.status === 429) {
+      const retry = res.headers.get('Retry-After') || 'a few';
+      log(`429 Rate limited — retry after ${retry}s`, 'err');
+      alert(`Rate limited by the Walmart portal. Retry after ${retry}s.`);
+      return;
+    }
+    if (!res.ok) {
+      log(`Unexpected status ${res.status}`, 'err');
+      alert(`Unexpected response from Walmart portal: ${res.status}`);
+      return;
+    }
+    const data = await res.json();
+    log(`200 OK — ${data.count} load(s) from "${data.source}"`, 'ok');
+
+    sanitizedRows = (data.loads || []).map(sanitizeLoad);
+    const readyCount = sanitizedRows.filter(r=>r.valid).length;
+    const reviewCount = sanitizedRows.length - readyCount;
+    log(`Sanitized: ${readyCount} ready, ${reviewCount} need review`, reviewCount ? 'warn' : 'ok');
+
+    renderTable();
+    renderStats();
+  } catch (e) {
+    log(`Fetch failed: ${e.message}`, 'err');
+    alert(`Could not reach the Walmart portal. This may be a network or CORS issue: ${e.message}`);
+  } finally {
+    setLoading('fetchBtn','fetchLabel', false, 'Fetch Loads');
+    document.getElementById('pushBtn').disabled = sanitizedRows.filter(r=>r.valid).length === 0;
+  }
+}
+
+async function pushLoads(){
+  const toPush = sanitizedRows.filter(r => r.valid && r.pushStatus !== 'accepted');
+  if (toPush.length === 0) {
+    alert('Nothing ready to push. Fetch loads first, or resolve the flagged rows.');
+    return;
+  }
+  setLoading('pushBtn','pushLabel', true);
+  const body = { loads: toPush.map(r => r.sanitized) };
+  log(`POST ${SHV_URL} — pushing ${toPush.length} load(s)`, 'info');
+
+  try {
+    const res = await fetch(SHV_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${EMAIL}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (res.status === 401) {
+      log('401 Unauthorized — Authorization header missing or malformed', 'err');
+      alert('SHV TMS rejected the request (401 Unauthorized).');
+      return;
+    }
+    if (res.status === 429) {
+      const retry = res.headers.get('Retry-After') || 'a few';
+      log(`429 Rate limited or capacity exceeded — retry after ${retry}s`, 'err');
+      alert(`Rate limited / capacity exceeded on SHV TMS. Retry after ${retry}s.`);
+      return;
+    }
+    if (res.status === 400) {
+      log('400 Malformed request body', 'err');
+      alert('SHV TMS reported the request body was malformed.');
+      return;
+    }
+
+    const data = await res.json();
+    const accepted = new Set(data.accepted || []);
+    const rejectedMap = {};
+    (data.rejected || []).forEach(r => { rejectedMap[r.load_number] = r.errors; });
+
+    toPush.forEach(r => {
+      if (accepted.has(r.sanitized.load_number)) {
+        r.pushStatus = 'accepted';
+      } else if (rejectedMap[r.sanitized.load_number]) {
+        r.pushStatus = 'rejected';
+        r.errors = rejectedMap[r.sanitized.load_number];
+      }
+    });
+
+    if (res.status === 200) {
+      log(`200 OK — ${data.accepted.length} load(s) accepted into the SOR`, 'ok');
+    } else if (res.status === 422) {
+      log(`422 — ${data.accepted.length} accepted, ${data.rejected.length} rejected`, 'warn');
+    } else {
+      log(`Status ${res.status} — ${data.message || ''}`, 'warn');
+    }
+
+    renderTable();
+    renderStats();
+  } catch (e) {
+    log(`Push failed: ${e.message}`, 'err');
+    alert(`Could not reach the SHV TMS. This may be a network or CORS issue: ${e.message}`);
+  } finally {
+    setLoading('pushBtn','pushLabel', false, 'Sanitize & Push');
+    document.getElementById('pushBtn').disabled = sanitizedRows.filter(r=>r.valid && r.pushStatus !== 'accepted').length === 0;
+  }
+}
+
+log('Ready. Click Fetch Loads to begin.', 'info');
+</script>
+</body>
+</html>
